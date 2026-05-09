@@ -8,6 +8,8 @@ import (
 	"goSearch/internal/search"
 )
 
+var exit = os.Exit
+
 func printUsage() {
 	fmt.Println("Usage: search <rootPath> <filePattern> [<searchString>]")
 	fmt.Println("")
@@ -29,7 +31,8 @@ func main() {
 	args := os.Args[1:]
 	if len(args) < 1 || len(args) > 3 {
 		printUsage()
-		os.Exit(1)
+		exit(1)
+		return
 	}
 
 	rootPath := args[0]
@@ -58,7 +61,7 @@ func main() {
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Search failed: %v\n", err)
-		os.Exit(1)
+		exit(1)
 	}
 	if len(matches) == 0 {
 		fmt.Println("No matches found")
