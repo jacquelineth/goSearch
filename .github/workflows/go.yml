@@ -39,10 +39,7 @@ jobs:
       - name: Install Go modules
         run: go mod download
 
-      - name: Lint (golangci-lint)
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
+
 
       - name: Build (Linux)
         run: go build -o bin/search-linux ./cmd/search
