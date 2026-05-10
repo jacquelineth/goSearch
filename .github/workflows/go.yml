@@ -1,7 +1,4 @@
-# This workflow will build a golang project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
-
-name: Go
+name: Go CI
 
 on:
   push:
@@ -10,36 +7,71 @@ on:
     branches: [ "main" ]
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.20'
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+          cache: true
 
-    - name: Install X11 / OpenGL build dependencies
-      run: |
+      - name: Install Linux build dependencies (X11/OpenGL)
+        run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libx11-dev \
-            libxext-dev \
-            libxcursor-dev \
-            libxrandr-dev \
-            libxi-dev \
-            libxinerama-dev \
-            mesa-common-dev \
-            libgl1-mesa-dev \
-            xorg-dev
+            libx11-dev libxext-dev libxcursor-dev libxrandr-dev \
+            libxi-dev libxinerama-dev mesa-common-dev libgl1-mesa-dev xorg-dev
 
-    - name: Install Go Modules
-      run: go mod tidy
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
-    - name: Build
-      run: go build -o bin/search ./cmd/search
+      - name: Install Go modules
+        run: go mod download
 
-    - name: Test
-      run: go test -v ./...
+      - name: Lint (golangci-lint)
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+      - name: Build (Linux)
+        run: go build -o bin/search-linux ./cmd/search
+
+      - name: Test
+        run: go test -v ./...
+
+  build-matrix:
+    name: Build multi-platform binaries
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+          cache: true
+
+      - name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          mkdir -p bin
+          go build -o bin/search-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/search
