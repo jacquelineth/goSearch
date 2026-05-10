@@ -1,23 +1,39 @@
 package main
-// @Todo Review and correct 
+
 import (
 	"bytes"
+	"io"
 	"os"
 	"testing"
 )
 
 func TestPrintUsage(t *testing.T) {
-	// Capture the output of printUsage
-	output := &bytes.Buffer{}
-	console := os.Stdout
-	os.Stdout = output
-	defer func() { os.Stdout = console }() // Restore stdout
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+	defer func() {
+		os.Stdout = oldStdout
+		_ = r.Close()
+	}()
+	os.Stdout = w
+
+	outputCh := make(chan []byte)
+	go func() {
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, r)
+		outputCh <- buf.Bytes()
+	}()
 
 	printUsage()
+	_ = w.Close()
+
+	output := <-outputCh
 
 	expected := "Usage: search <rootPath> <filePattern> [<searchString>]"
-	if !bytes.Contains(output.Bytes(), []byte(expected)) {
-		t.Errorf("printUsage() = %q, want %q", output.String(), expected)
+	if !bytes.Contains(output, []byte(expected)) {
+		t.Errorf("printUsage() = %q, want %q", string(output), expected)
 	}
 }
 
@@ -33,7 +49,7 @@ func TestMainArgumentValidation(t *testing.T) {
 		{[]string{"cmd"}, true},
 		{[]string{"cmd", "rootPath"}, false},
 		{[]string{"cmd", "rootPath", "filePattern"}, false},
-		{[]string{"cmd", "rootPath", "filePattern", "extra"}, true},
+		{[]string{"cmd", "rootPath", "filePattern", "extra", "another"}, true},
 	}
 
 	for _, c := range cases {
